@@ -20,6 +20,12 @@ const glints = Array.from({ length: 250 }, () => ({
     alpha: 0.2 + Math.random() * 0.5,
 }));
 
+let oil = 100;
+let score = 0;
+let gameOver = false;
+let gameWon = false;
+let gameTimer = 60;
+
 function makeContact({
     id,
     name,
@@ -70,17 +76,25 @@ const night1Script = [
 ];
 
 let activeContacts = [];
-let nightTime = 0;
-let script = night1Script;
+let spawnTimer = 0;
+let reloadTriggered = false;
 
 function updateSpawns(dt) {
-    nightTime += dt;
-    for (const c of script) {
-        if (!c.spawned && nightTime >= c.spawnAt) {
-            c.spawned = true;
-            c.state = "active";
-            activeContacts.push(c);
-        }
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) {
+        const bearingDeg = 20 + Math.random() * 140;
+        const newShip = makeContact({
+            id: "ship-" + Math.random(),
+            name: "NAV",
+            bearingDeg: bearingDeg,
+            distance: 200 + Math.random() * 400,
+            spawnAt: 0,
+            resolveTime: 3 + Math.random() * 2,
+            windowTime: 7 + Math.random() * 5,
+        });
+        newShip.state = "active"
+        activeContacts.push(newShip)
+        spawnTimer = 3 + Math.random() * 3;
     }
 }
 
@@ -131,7 +145,7 @@ function updateContacts(dt, beamAngle) {
             c.litGlow = Math.max(0, c.litGlow - dt * 5);
         }
     }
-    activeContacts = activeContacts.filter((c) => c.state == "active");
+   activeContacts = activeContacts.filter((c) => c.state == "active" || (c.state == "resolved" && !c.counted));
 }
 
 function drawContact(c, centerX, centerY) {
@@ -160,7 +174,7 @@ function drawContact(c, centerX, centerY) {
     if (c.litGlow > 0.01) {
         // const boatAlpha = c.litGlow * (0.5 + 0.5 * c.resolveProgress);
         ctx.globalCompositeOperation = "source-over"; // default so it doesn't get transparent
-        ctx.fillStyle = "rgba(10, 10, 20, " + 255 + ")";
+        ctx.fillStyle = "rgba(10, 10, 20, 0.9)"; 
         // boat silhouete
         ctx.beginPath();
         ctx.arc(x, y + 2, 16, 0, Math.PI, false);
@@ -220,6 +234,82 @@ function drawLightbeam(centerX, centerY, angle) {
     drawBrightWaves(time); // same
 
     ctx.restore(); //reset composite and clip
+}
+
+function updateGameLogic(dt, targetAngle) {
+    if (gameOver || gameWon) {
+        return;
+    }
+
+    gameTimer -= dt;
+    if (gameTimer <= 0) {
+        gameWon = true;
+        triggerReload();
+        return;
+    }
+
+    let isAnyContactLit = false;
+    for (const c of activeContacts) {
+        if (isBeamOnContact(targetAngle, c.angle)) {
+            isAnyContactLit = true;
+            break;
+        }
+    }
+
+    const drainRate = isAnyContactLit ? 4 : 1;
+    oil = Math.max(0, oil - drainRate * dt);
+    if (oil <= 0) {
+        gameOver = true;
+    }
+
+    for (const c of activeContacts) {
+    if (c.state === "resolved" && !c.counted) {
+        score += 100;
+        oil = Math.min(100, oil + 10);
+        c.counted = true;
+    }
+}
+}
+
+function triggerReload() {
+    if (reloadTriggered) return;
+    reloadTriggered = true;
+    setTimeout(() => window.location.reload(), 3000);
+}
+
+function drawHUD() {
+    ctx.save();
+    ctx.fillStyle = "#fff";
+    ctx.font = "16px monospace";
+
+    ctx.fillText("oil: " + Math.round(oil) + "%", 20, 30);
+    ctx.fillText(
+        "time remaining: " + Math.ceil(Math.max(0, gameTimer)) + "s",
+        20,
+        55,
+    );
+    ctx.fillText("score: " + score, 20, 80);
+
+    if (gameOver) {
+        ctx.fillStyle = "rgba(0, 0,0,0.8)";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        ctx.fillStyle = "#7a1a1a";
+        ctx.font = "32px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("LIGHTS OUT", WIDTH / 2, HEIGHT / 2); // just game over doesn't mean something else
+        ctx.font = "14px monospace";
+        ctx.fillText("RESTARTING IN 3s...", WIDTH / 2, HEIGHT / 2 + 40);
+    } else if (gameWon) {
+        ctx.fillStyle = "rgba(0,0,0,0.8)";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        ctx.fillStyle = "#208755";
+        ctx.font = "32px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("THE NIGHT ENDED, THE LIGHT RISES", WIDTH / 2, HEIGHT / 2); // that the best I could find
+        ctx.font = "14px monospace";
+        ctx.fillText("RESTARTING IN 3s...", WIDTH / 2, HEIGHT / 2 + 40);
+    }
+    ctx.restore();
 }
 
 function drawAmbientWaves(time) {
@@ -322,7 +412,7 @@ function renderGame(targetAngle) {
     drawLightbeam(centerX, centerY, targetAngle);
 
     for (const c of activeContacts) {
-        drawContact(c, centerX, centerY, targetAngle);
+        drawContact(c, centerX, centerY);
     }
 
     // Coastline land
@@ -340,6 +430,7 @@ function render(targetAngle) {
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
     renderGame(targetAngle);
+    drawHUD();
 }
 
 function mainLoop(currentTime) {
@@ -359,8 +450,11 @@ function mainLoop(currentTime) {
         targetAngle = Math.atan2(dy, dx);
     }
 
-    updateSpawns(delta);
-    updateContacts(delta, targetAngle);
+    if (!gameOver && !gameWon) {
+        updateSpawns(delta);
+        updateContacts(delta, targetAngle);
+        updateGameLogic(delta, targetAngle);
+    }
 
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
