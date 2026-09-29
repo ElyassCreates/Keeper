@@ -5,9 +5,18 @@ const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 
 let lastTime;
-let lastTargetAngle = -Math.PI/2;
+let lastTargetAngle = -Math.PI / 2;
+let time = 0;
 
 let mouse = { x: WIDTH / 2, y: 0 };
+const glints = Array.from({ length: 250 }, () => ({
+    // had to relearn how to do it without a for loop
+    x: Math.random() * WIDTH,
+    y: Math.random() * HEIGHT,
+    len: 3 + Math.random() * 10,
+    offset: Math.random() * Math.PI * 2, // full cylce with sin
+    alpha: 0.2 + Math.random() * 0.5,
+}));
 
 canvas.addEventListener("mousemove", (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -52,13 +61,113 @@ function drawLightbeam(centerX, centerY, angle) {
     ctx.fillStyle = gradient;
     ctx.fill();
 
-    ctx.restore(); // to not change the other drawings styles (globalCompositeOperation)
+    ctx.clip();
+    drawGlints(time); // so they only appear in the cone clip, if they're enlightned
+    drawBrightWaves(time); // same
+
+    ctx.restore(); //reset composite and clip
+}
+
+function drawAmbientWaves(time) {
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(40, 80, 110, 0.15)";
+
+    for (let y = 0; y < HEIGHT; y += 20) {
+        ctx.beginPath();
+
+        for (let x = 0; x <= WIDTH; x += 10) {
+            const waveY =
+                y +
+                Math.sin(x * 0.015 + time * 0.8 + y * 0.03) * 3 +
+                Math.sin(x * 0.03 - time * 0.5) * 0.12;
+
+            if (x == 0) {
+                ctx.moveTo(x, waveY);
+            } else {
+                ctx.lineTo(x, waveY);
+            }
+        }
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+function drawBrightWaves(time) {
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "rgba(120, 210, 255, 0.25)";
+
+    for (let y = 0; y < HEIGHT; y += 22) {
+        ctx.beginPath();
+
+        for (let x = 0; x <= WIDTH; x += 6) {
+            const waveY =
+                y +
+                Math.sin(x * 0.02 + time * 1.5 + y * 0.04) * 3 +
+                Math.sin(x * 0.04 - time * 0.9) * 1.5;
+
+            if (x == 0) {
+                ctx.moveTo(x, waveY);
+            } else {
+                ctx.lineTo(x, waveY);
+            }
+        }
+        ctx.stroke();
+    }
+}
+
+function drawGlints(time) {
+    ctx.lineWidth = 1;
+
+    for (const g of glints) {
+        const x = (g.x + Math.sin(time * 0.5 + g.offset) * 6 + WIDTH) % WIDTH;
+        const y = g.y + Math.sin(time * 0.7 + g.offset) * 2;
+
+        const currentAlpha =
+            g.alpha *
+            (0.3 + 0.7 * Math.pow(Math.sin(time * 2.5 + g.offset), 2));
+
+        ctx.strokeStyle = "rgba(255, 245, 200, " + currentAlpha + ")";
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + g.len, y - 0.5);
+        ctx.stroke();
+    }
+}
+
+function drawCoastlinePath(centerY, offset) {
+    ctx.beginPath();
+    ctx.moveTo(0, HEIGHT);
+
+    for (let x = 0; x <= WIDTH; x += 15) {
+        const shoreY =
+            centerY +
+            Math.sin(x * 0.003) * 50 +
+            Math.cos(x * 0.012) * 20 +
+            offset;
+        ctx.lineTo(x, shoreY);
+    }
+    ctx.lineTo(WIDTH, HEIGHT);
+    ctx.closePath();
+}
+
+function drawLand(centerY) {
+    ctx.save()
+    drawCoastlinePath(centerY, 0);
+    ctx.fillStyle = "#3e3a38";
+    ctx.fill();
+    ctx.restore()
 }
 
 function renderGame() {
     const centerX = WIDTH / 2;
     const centerY = 960;
 
+    
+    // Waves
+    drawAmbientWaves(time);
+    
     // Beam
     const dx = mouse.x - centerX;
     const dy = mouse.y - centerY;
@@ -66,9 +175,11 @@ function renderGame() {
     if (targetAngle > 0) {
         targetAngle = targetAngle < Math.PI ? lastTargetAngle : -Math.PI;
     }
-    lastTargetAngle = targetAngle
-    
+    lastTargetAngle = targetAngle;
     drawLightbeam(centerX, centerY, targetAngle);
+
+    // Coastline land
+    drawLand(centerY);
 
     // Lighthouse
     ctx.fillStyle = "#600";
@@ -90,6 +201,7 @@ function mainLoop(currentTime) {
     }
     const delta = (currentTime - lastTime) / 1000;
     lastTime = currentTime;
+    time += delta;
 
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
