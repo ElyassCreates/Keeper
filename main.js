@@ -4,8 +4,10 @@ const ctx = canvas.getContext("2d");
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 
+const centerX = WIDTH / 2;
+const centerY = 960;
+
 let lastTime;
-let lastTargetAngle = -Math.PI / 2;
 let time = 0;
 
 let mouse = { x: WIDTH / 2, y: 0 };
@@ -17,6 +19,157 @@ const glints = Array.from({ length: 250 }, () => ({
     offset: Math.random() * Math.PI * 2, // full cylce with sin
     alpha: 0.2 + Math.random() * 0.5,
 }));
+
+function makeContact({
+    id,
+    name,
+    bearingDeg,
+    distance,
+    spawnAt,
+    resolveTime,
+    windowTime,
+}) {
+    return {
+        id,
+        name,
+        angle: -Math.PI + (bearingDeg / 180) * Math.PI,
+        distance,
+        spawnAt,
+        resolveTime,
+        windowTime,
+        oilRate: 4 + distance / 50,
+        // runtime state
+        spawned: false,
+        resolveProgress: 0,
+        timeLeft: windowTime,
+        state: "pending",
+        pulsePhase: 0,
+        litGlow: 0,
+    };
+}
+
+const night1Script = [
+    makeContact({
+        id: "unknown-1",
+        name: null,
+        bearingDeg: 110,
+        distance: 350,
+        spawnAt: 0,
+        resolveTime: 5,
+        windowTime: 10,
+    }),
+    makeContact({
+        id: "merrow",
+        name: "MERROW",
+        bearingDeg: 50,
+        distance: 250,
+        spawnAt: 25,
+        resolveTime: 4,
+        windowTime: 18,
+    }),
+];
+
+let activeContacts = [];
+let nightTime = 0;
+let script = night1Script;
+
+function updateSpawns(dt) {
+    nightTime += dt;
+    for (const c of script) {
+        if (!c.spawned && nightTime >= c.spawnAt) {
+            c.spawned = true;
+            c.state = "active";
+            activeContacts.push(c);
+        }
+    }
+}
+
+function contactPosition(c, centerX, centerY) {
+    return {
+        x: centerX + c.distance * Math.cos(c.angle),
+        y: centerY + c.distance * Math.sin(c.angle),
+    };
+}
+
+const BEAM_HALF_ANGLE = Math.PI / 9 / 2;
+
+function isBeamOnContact(beamAngle, contactAngle) {
+    let diff = Math.abs(beamAngle - contactAngle);
+    if (diff > Math.PI) {
+        diff = Math.PI * 2 - diff;
+    }
+    return diff <= BEAM_HALF_ANGLE;
+}
+
+function updateContacts(dt, beamAngle) {
+    for (const c of activeContacts) {
+        if (c.state !== "active") continue;
+
+        c.timeLeft -= dt;
+        if (c.timeLeft <= 0) {
+            c.state = "lost"; // what have you done
+            continue;
+        }
+
+        const urgency = 1 - c.timeLeft / c.windowTime;
+        const pulseSpeed = 2 + urgency * 6;
+        c.pulsePhase += pulseSpeed * dt;
+
+        const lit = isBeamOnContact(beamAngle, c.angle);
+        if (lit) {
+            c.resolveProgress += dt / c.resolveTime;
+            c.litGlow = Math.min(1, c.litGlow + dt * 5);
+            // drain oil later
+            if (c.resolveProgress >= 1) {
+                c.state = "resolved";
+            }
+        } else {
+            c.resolveProgress = Math.max(
+                0,
+                c.resolveProgress - (dt / c.resolveTime) * 0.5,
+            );
+            c.litGlow = Math.max(0, c.litGlow - dt * 5);
+        }
+    }
+    activeContacts = activeContacts.filter((c) => c.state == "active");
+}
+
+function drawContact(c, centerX, centerY) {
+    const { x, y } = contactPosition(c, centerX, centerY);
+    const pulse = 0.5 + 0.5 * Math.sin(c.pulsePhase);
+
+    const urgency = 1 - c.timeLeft / c.windowTime;
+    const dotRadius = 10 + c.resolveProgress * 18;
+    const dotAlpha = 0.2 + 0.3 * pulse;
+
+    const r = Math.round(200 + c.resolveProgress * 55);
+    const g = Math.round(210 + c.resolveProgress * 30);
+    const b = Math.round(210 - c.resolveProgress * 60);
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    const dotGrad = ctx.createRadialGradient(x, y, 0, x, y, dotRadius);
+    dotGrad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${dotAlpha})`); // I'm not doing + for all of this
+    dotGrad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+    ctx.fillStyle = dotGrad;
+    ctx.beginPath();
+    ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (c.litGlow > 0.01) {
+        // const boatAlpha = c.litGlow * (0.5 + 0.5 * c.resolveProgress);
+        ctx.globalCompositeOperation = "source-over"; // default so it doesn't get transparent
+        ctx.fillStyle = "rgba(10, 10, 20, " + 255 + ")";
+        // boat silhouete
+        ctx.beginPath();
+        ctx.arc(x, y + 2, 16, 0, Math.PI, false);
+        ctx.fill();
+
+        ctx.fillRect(x - 8, y - 9, 11, 12);
+    }
+    ctx.restore();
+}
 
 canvas.addEventListener("mousemove", (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -53,9 +206,10 @@ function drawLightbeam(centerX, centerY, angle) {
         centerY,
         beamLength,
     );
-    gradient.addColorStop(0, "rgba(254, 238, 174, 0.8)");
-    gradient.addColorStop(0.3, "rgba(255, 220, 120, 0.3)"); //absolutely necessary
-    gradient.addColorStop(1, "rgba(255, 200, 100, 0)");
+
+    gradient.addColorStop(0, "rgba(255, 215, 120, 0.45)");
+    gradient.addColorStop(0.25, "rgba(255, 180, 80, 0.2)");
+    gradient.addColorStop(1, "rgba(255, 140, 50, 0)");
 
     ctx.globalCompositeOperation = "lighter";
     ctx.fillStyle = gradient;
@@ -153,30 +307,23 @@ function drawCoastlinePath(centerY, offset) {
 }
 
 function drawLand(centerY) {
-    ctx.save()
+    ctx.save();
     drawCoastlinePath(centerY, 0);
     ctx.fillStyle = "#3e3a38";
     ctx.fill();
-    ctx.restore()
+    ctx.restore();
 }
 
-function renderGame() {
-    const centerX = WIDTH / 2;
-    const centerY = 960;
-
-    
+function renderGame(targetAngle) {
     // Waves
     drawAmbientWaves(time);
-    
+
     // Beam
-    const dx = mouse.x - centerX;
-    const dy = mouse.y - centerY;
-    let targetAngle = Math.atan2(dy, dx);
-    if (targetAngle > 0) {
-        targetAngle = targetAngle < Math.PI ? lastTargetAngle : -Math.PI;
-    }
-    lastTargetAngle = targetAngle;
     drawLightbeam(centerX, centerY, targetAngle);
+
+    for (const c of activeContacts) {
+        drawContact(c, centerX, centerY, targetAngle);
+    }
 
     // Coastline land
     drawLand(centerY);
@@ -188,11 +335,11 @@ function renderGame() {
     ctx.fill();
 }
 
-function render() {
+function render(targetAngle) {
     ctx.fillStyle = "#050510";
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-    renderGame();
+    renderGame(targetAngle);
 }
 
 function mainLoop(currentTime) {
@@ -203,9 +350,21 @@ function mainLoop(currentTime) {
     lastTime = currentTime;
     time += delta;
 
+    const dx = mouse.x - centerX;
+    const dy = mouse.y - centerY;
+    let targetAngle;
+    if (dy >= 0) {
+        targetAngle = dx >= 0 ? -0.001 : -Math.PI + 0.001;
+    } else {
+        targetAngle = Math.atan2(dy, dx);
+    }
+
+    updateSpawns(delta);
+    updateContacts(delta, targetAngle);
+
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-    render();
+    render(targetAngle);
 
     requestAnimationFrame(mainLoop);
 }
