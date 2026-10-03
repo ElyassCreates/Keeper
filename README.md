@@ -8,7 +8,7 @@ In this game, you control the direction of a lighthouse beam during the night. T
 The game also features an animated ocean only using canvas and sine waves and oil, score and countdown system. 
 
 ### Screenshots
-![Screenshot](image.png)
+![Screenshot](screenshot.png)
 
 ## Getting Started
 
