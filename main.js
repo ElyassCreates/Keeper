@@ -31,7 +31,6 @@ function makeContact({
     name,
     bearingDeg,
     distance,
-    spawnAt,
     resolveTime,
     windowTime,
 }) {
@@ -40,40 +39,16 @@ function makeContact({
         name,
         angle: -Math.PI + (bearingDeg / 180) * Math.PI,
         distance,
-        spawnAt,
         resolveTime,
         windowTime,
-        oilRate: 4 + distance / 50,
         // runtime state
-        spawned: false,
         resolveProgress: 0,
         timeLeft: windowTime,
-        state: "pending",
+        state: "active",
         pulsePhase: 0,
         litGlow: 0,
     };
 }
-
-const night1Script = [
-    makeContact({
-        id: "unknown-1",
-        name: null,
-        bearingDeg: 110,
-        distance: 350,
-        spawnAt: 0,
-        resolveTime: 5,
-        windowTime: 10,
-    }),
-    makeContact({
-        id: "merrow",
-        name: "MERROW",
-        bearingDeg: 50,
-        distance: 250,
-        spawnAt: 25,
-        resolveTime: 4,
-        windowTime: 18,
-    }),
-];
 
 let activeContacts = [];
 let spawnTimer = 0;
@@ -88,7 +63,6 @@ function updateSpawns(dt) {
             name: "NAV",
             bearingDeg: bearingDeg,
             distance: 200 + Math.random() * 400,
-            spawnAt: 0,
             resolveTime: 3 + Math.random() * 2,
             windowTime: 7 + Math.random() * 5,
         });
@@ -105,14 +79,14 @@ function contactPosition(c, centerX, centerY) {
     };
 }
 
-const BEAM_HALF_ANGLE = Math.PI / 9 / 2;
+const beam_half_angle = Math.PI / 9 / 2;
 
 function isBeamOnContact(beamAngle, contactAngle) {
     let diff = Math.abs(beamAngle - contactAngle);
     if (diff > Math.PI) {
         diff = Math.PI * 2 - diff;
     }
-    return diff <= BEAM_HALF_ANGLE;
+    return diff <= beam_half_angle;
 }
 
 function updateContacts(dt, beamAngle) {
@@ -152,7 +126,6 @@ function drawContact(c, centerX, centerY) {
     const { x, y } = contactPosition(c, centerX, centerY);
     const pulse = 0.5 + 0.5 * Math.sin(c.pulsePhase);
 
-    const urgency = 1 - c.timeLeft / c.windowTime;
     const dotRadius = 10 + c.resolveProgress * 18;
     const dotAlpha = 0.2 + 0.3 * pulse;
 
