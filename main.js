@@ -236,6 +236,7 @@ function updateGameLogic(dt, targetAngle) {
     oil = Math.max(0, oil - drainRate * dt);
     if (oil <= 0) {
         gameOver = true;
+        triggerReload();
     }
 
     for (const c of activeContacts) {
