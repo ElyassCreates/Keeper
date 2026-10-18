@@ -66,8 +66,8 @@ function updateSpawns(dt) {
             resolveTime: 3 + Math.random() * 2,
             windowTime: 7 + Math.random() * 5,
         });
-        newShip.state = "active"
-        activeContacts.push(newShip)
+        newShip.state = "active";
+        activeContacts.push(newShip);
         spawnTimer = 3 + Math.random() * 3;
     }
 }
@@ -120,7 +120,9 @@ function updateContacts(dt, beamAngle) {
             c.litGlow = Math.max(0, c.litGlow - dt * 5);
         }
     }
-   activeContacts = activeContacts.filter((c) => c.state == "active" || (c.state == "resolved" && !c.counted));
+    activeContacts = activeContacts.filter(
+        (c) => c.state == "active" || (c.state == "resolved" && !c.counted),
+    );
 }
 
 function drawContact(c, centerX, centerY) {
@@ -148,7 +150,7 @@ function drawContact(c, centerX, centerY) {
     if (c.litGlow > 0.01) {
         // const boatAlpha = c.litGlow * (0.5 + 0.5 * c.resolveProgress);
         ctx.globalCompositeOperation = "source-over"; // default so it doesn't get transparent
-        ctx.fillStyle = "rgba(10, 10, 20, 0.9)"; 
+        ctx.fillStyle = "rgba(10, 10, 20, 0.9)";
         // boat silhouete
         ctx.beginPath();
         ctx.arc(x, y + 2, 16, 0, Math.PI, false);
