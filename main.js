@@ -230,19 +230,19 @@ function updateGameLogic(dt, targetAngle) {
         }
     }
 
-    const drainRate = isAnyContactLit ? 4 : 1;
+    const drainRate = isAnyContactLit ? 3 : 2;
     oil = Math.max(0, oil - drainRate * dt);
     if (oil <= 0) {
         gameOver = true;
     }
 
     for (const c of activeContacts) {
-    if (c.state === "resolved" && !c.counted) {
-        score += 100;
-        oil = Math.min(100, oil + 10);
-        c.counted = true;
+        if (c.state == "resolved" && !c.counted) {
+            score += 100;
+            oil = Math.min(100, oil + 12);
+            c.counted = true;
+        }
     }
-}
 }
 
 function triggerReload() {
