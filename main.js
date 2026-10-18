@@ -254,15 +254,15 @@ function triggerReload() {
 function drawHUD() {
     ctx.save();
     ctx.fillStyle = "#fff";
-    ctx.font = "16px monospace";
+    ctx.font = "32px monospace";
 
-    ctx.fillText("oil: " + Math.round(oil) + "%", 20, 30);
+    ctx.fillText("oil: " + Math.round(oil) + "%", 20, 40);
     ctx.fillText(
         "time remaining: " + Math.ceil(Math.max(0, gameTimer)) + "s",
         20,
-        55,
+        80,
     );
-    ctx.fillText("score: " + score, 20, 80);
+    ctx.fillText("score: " + score, 20, 120);
 
     if (gameOver) {
         ctx.fillStyle = "rgba(0, 0,0,0.8)";
@@ -270,7 +270,7 @@ function drawHUD() {
         ctx.fillStyle = "#7a1a1a";
         ctx.font = "32px monospace";
         ctx.textAlign = "center";
-        ctx.fillText("LIGHTS OUT", WIDTH / 2, HEIGHT / 2); // just game over doesn't mean something else
+        ctx.fillText("GAME OVER", WIDTH / 2, HEIGHT / 2);
         ctx.font = "14px monospace";
         ctx.fillText("RESTARTING IN 3s...", WIDTH / 2, HEIGHT / 2 + 40);
     } else if (gameWon) {
@@ -279,7 +279,7 @@ function drawHUD() {
         ctx.fillStyle = "#208755";
         ctx.font = "32px monospace";
         ctx.textAlign = "center";
-        ctx.fillText("THE NIGHT ENDED, THE LIGHT RISES", WIDTH / 2, HEIGHT / 2); // that the best I could find
+        ctx.fillText("VICTORY | SCORE: " + score, WIDTH / 2, HEIGHT / 2);
         ctx.font = "14px monospace";
         ctx.fillText("RESTARTING IN 3s...", WIDTH / 2, HEIGHT / 2 + 40);
     }
