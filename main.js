@@ -96,6 +96,7 @@ function updateContacts(dt, beamAngle) {
         c.timeLeft -= dt;
         if (c.timeLeft <= 0) {
             c.state = "lost"; // what have you done
+            oil = Math.max(0, oil - 20);
             continue;
         }
 
